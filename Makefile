@@ -1,5 +1,5 @@
 
-.PHONY: package deploy build
+.PHONY: package deploy build test
 
 #binaries
 TSC=npx tsc
@@ -34,8 +34,23 @@ $(word 1, $(JS_OUT)): $(TS_SRC)
 
 package: $(LAMBDA_PACKAGE)
 
-$(LAMBDA_PACKAGE): $(word 1, $(JS_OUT))
-	cd $(JS_OUTDIR); zip -r $(LAMBDA_PACKAGE) .; mv $(LAMBDA_PACKAGE) ../
+package_lock.json: package.json
+	npm install
+
+$(JS_OUTDIR)/node_modules/: package-lock.json
+	cp package.json package-lock.json $(JS_OUTDIR); \
+	cd $(JS_OUTDIR); \
+	npm install --production; \
+	rm package.json package-lock.json; \
+	cd ..
+
+$(LAMBDA_PACKAGE): $(JS_OUTDIR)/node_modules/ $(word 1, $(JS_OUT))
+	cd $(JS_OUTDIR); \
+	zip -r $(LAMBDA_PACKAGE) .; \
+	mv $(LAMBDA_PACKAGE) ../
 
 deploy: $(LAMBDA_PACKAGE)
 	aws lambda update-function-code --function-name hello_lambda_handler --zip-file fileb://$(LAMBDA_PACKAGE)
+
+test:
+	npx mocha
